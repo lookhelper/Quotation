@@ -1,0 +1,47 @@
+function doPost(e) {
+  try {
+    const body = JSON.parse(e.postData.contents);
+
+    const data = body.data;
+    const pdfBase64 = body.pdfBase64;
+    const fileName = body.fileName;
+
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Sheet1");
+    const folder = DriveApp.getFolderById("1_hN1AqCdUvgJA6M-hN9LQ0t2ZZ2-E3m-");
+
+    const blob = Utilities.newBlob(
+      Utilities.base64Decode(pdfBase64),
+      "application/pdf",
+      fileName
+    );
+
+    const file = folder.createFile(blob);
+    const pdfLink = file.getUrl();
+
+    const rate = parseFloat(data.rate) || 0;
+    const qty = parseFloat(data.qty) || 0;
+
+    const subtotal = rate * qty;
+    const gst = subtotal * 0.18;
+    const grandTotal = subtotal + gst;
+
+    sheet.appendRow([
+      new Date(),
+      data.refNo,
+      data.client,
+      data.product,
+      data.qty,
+      data.rate,
+      subtotal,
+      gst,
+      grandTotal,
+      "Generated",
+      pdfLink
+    ]);
+
+    return ContentService.createTextOutput("SUCCESS");
+
+  } catch (err) {
+    return ContentService.createTextOutput(err.toString());
+  }
+}
