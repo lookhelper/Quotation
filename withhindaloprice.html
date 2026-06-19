@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saru Aikoh - Professional Quotation System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #1a365d; --accent: #3182ce; --text-dark: #2d3748; }
+        body { font-family: 'Inter', sans-serif; background: #e2e8f0; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+        .sidebar { width: 440px; background: #fff; padding: 20px; overflow-y: auto; box-shadow: 4px 0 10px rgba(0,0,0,0.1); z-index: 10; }
+        .card { background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e2e8f0; }
+        h3 { margin: 0 0 15px 0; color: var(--primary); font-size: 18px; display: flex; align-items: center; justify-content: space-between; }
+        label { display: block; font-weight: 700; margin: 10px 0 4px; font-size: 11px; color: #64748b; text-transform: uppercase; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 13px; margin-bottom: 5px; box-sizing: border-box; }
+        
+        .prod-row { display: flex; flex-direction: column; gap: 5px; background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 10px; }
+        .row-top { display: grid; grid-template-columns: 1fr 80px 100px 40px; gap: 8px; align-items: center; }
+        .btn-add { background: var(--accent); color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: 600; width: 100%; }
+        .btn-del { background: #fee2e2; color: #ef4444; border: none; cursor: pointer; height: 35px; border-radius: 5px; font-weight: bold; }
+
+        .preview-area { flex-grow: 1; padding: 40px; display: flex; justify-content: center; background: #525659; overflow-y: auto; }
+        #quotation-canvas { 
+            width: 210mm; height: 297mm; background: white; 
+            padding: 42mm 18mm 16mm 18mm; box-sizing: border-box; position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        
+        #bg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; object-fit: fill; }
+        .content-layer { 
+            position: relative; z-index: 1; color: #000; 
+            transform-origin: top left;
+            max-width: none;
+            will-change: transform;
+        }
+
+        .meta-header { display: flex; justify-content: space-between; border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-bottom: 14px; font-weight: 700; }
+        .subject-line { text-align: center; font-weight: 800; margin: 0 0 10px 0; font-size: 15px; text-transform: uppercase; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; table-layout: fixed; }
+        th { background: var(--primary); color: white; padding: 10px; text-align: left; font-size: 12px; text-transform: uppercase; }
+        td { border: 1px solid #e2e8f0; padding: 10px; font-size: 13px; vertical-align: top; word-wrap: break-word; }
+        .p-desc-text { display: block; font-size: 11px; color: #4b5563; margin-top: 4px; font-style: italic; }
+
+        .total-box { margin-left: auto; width: 280px; margin-top: 10px; }
+        .total-item { display: flex; justify-content: space-between; padding: 2px 0; font-weight: 500; font-size: 11px; border-bottom: 1px dashed #cbd5e0; color: #4b5563; }
+        .grand-total { font-size: 15px; font-weight: 800; color: #000; border-bottom: 2px solid var(--primary); padding-top: 8px; margin-top: 4px; }
+
+.amount-words { 
+    text-align: right; 
+    font-size: 14px; 
+    color: #000; 
+    margin-top: 15px; /* Thoda sa gap grand total box se */
+    font-weight: 700; 
+    width: 100%; /* Ye poore page ki width lega */
+    display: block;
+    clear: both; /* Taaki koi floating element ise na roke */
+}
+        .terms-section { margin-top: 30px; font-size: 11px; line-height: 1.6; border-top: 1px solid #eee; padding-top: 10px; }
+        .btn-download { width: 100%; padding: 18px; background: #059669; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h3>Quotation Panel 
+        <span id="status" style="font-size:10px; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:10px;">System Ready</span>
+    </h3>
+    
+    <div class="card">
+        <label>Ref Number & Date</label>
+        <input type="text" id="refNo" readonly style="background:#edf2f7; font-weight:bold; color:var(--primary);">
+        <input type="date" id="qDate" onchange="updatePreview()">
+    </div>
+
+    <div class="card">
+        <label>Client Details</label>
+        <textarea id="clientDetails" rows="2" oninput="updatePreview()">M/s. RTC, Ahmedabad [Guj.]</textarea>
+        <label>Kind Attn (Optional)</label>
+        <input type="text" id="attn" value="Mr. Mansukh Patel" oninput="updatePreview()">
+        
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1"><label>Source</label><input type="text" id="source" value="Phone / IndiaMART" oninput="updatePreview()"></div>
+            <div style="flex:1"><label>Discussion</label><input type="text" id="discussion" value="Telephonic / Mail" oninput="updatePreview()"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <label>Products List</label>
+        <div id="product-inputs"></div>
+        <button class="btn-add" onclick="addProductRow()">+ Add Item</button>
+    </div>
+
+    <div class="card">
+        <label>Market Price (Optional / Sheet Only)</label>
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1">
+                <label>Hindalco Price <span style="font-weight:400; text-transform:none; color:#94a3b8;">(Optional)</span></label>
+                <input type="number" id="hindalcoPrice" placeholder="Optional" step="0.01" min="0">
+            </div>
+            <div style="flex:1">
+                <label>Nalco Price <span style="font-weight:400; text-transform:none; color:#94a3b8;">(Optional)</span></label>
+                <input type="number" id="nalcoPrice" placeholder="Optional" step="0.01" min="0">
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <label>Authorized Signatory</label>
+        <select id="sender" onchange="updatePreview()">
+            <option value="Raj Mohan Bhat|Vice President (Sales & Marketing)">Raj Mohan Bhat</option>
+            <option value="Kanishk Jain|Director">Kanishk Jain</option>
+            <option value="Shyam Veer Chauhan|Assistant Manager (Sales & Marketing)">Shyam Veer Chauhan</option>
+            <option value="Anurag Sharma|Manager (Marketing)">Anurag Sharma</option>
+            <option value="Avinash P. Dhole|Business Manager (West, South & M.P.)">Avinash P. Dhole</option>
+            <option value="Manoj Giri|Asst. Manager Sales (North India)">Manoj Giri</option>
+            <option value="Dr. Sanjay Kumar|Deputy Manager (Technical & Application)">Dr. Sanjay Kumar</option>
+            <option value="Vineet Rajvanshi|Manager (Accounts & Taxation)">Vineet Rajvanshi</option>
+            <option value="Kaushal Jha|Marketing Executive">Kaushal Jha</option>
+        </select>
+    </div>
+
+    <button class="btn-download" onclick="downloadPDF()">Download Official PDF</button>
+</div>
+
+<div class="preview-area">
+    <div id="quotation-canvas">
+        <img id="bg-layer" src="letterpad.png" alt="Letterhead" onerror="this.style.display='none'">
+        
+        <div class="content-layer">
+            <div class="subject-line" id="p-subject">QUOTATION FOR PRODUCT</div>
+            <div class="meta-header">
+                <span>Ref: <span id="p-ref"></span></span>
+                <span>Date: <span id="p-date"></span></span>
+            </div>
+
+            <div style="margin-bottom:15px; line-height:1.5;">
+                TO,<br>
+                <b id="p-client" style="font-size:16px; white-space: pre-line;"></b><br>
+                <span id="attn-line"><b>Kind Attn:</b> <span id="p-attn"></span></span>
+            </div>
+
+            <div style="font-size:11px; margin-bottom:10px; color:#555">
+                <b>Source:</b> <span id="p-source"></span> &nbsp;|&nbsp; 
+                <b>Discussion:</b> <span id="p-discussion"></span>
+            </div>
+
+            <p style="font-size:13px;">Dear Sir, Greetings from <b>Saru Aikoh Chemicals.</b> We are pleased to offer our best prices:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th width="55%">Description of Goods</th>
+                        <th width="15%">Quantity</th>
+                        <th width="15%">Rate/Unit</th>
+                        <th width="15%">Total (INR)</th>
+                    </tr>
+                </thead>
+                <tbody id="p-table-body"></tbody>
+            </table>
+
+            <div class="total-box">
+                <div class="total-item"><span>Sub Total Value</span><span id="p-sub">0.00</span></div>
+                <div class="total-item"><span>Add: IGST @18%</span><span id="p-gst">0.00</span></div>
+                <div class="total-item grand-total"><span>Grand Total</span><span id="p-grand">0.00</span></div> 
+            </div>
+
+            <div id="p-amount-words" class="amount-words"></div>
+            <div class="terms-section">
+                <b style="color:var(--primary); text-decoration:underline;">Terms & Conditions:</b><br>
+                1. <b>Delivery:</b> F.O.R. Meerut (Freight To Pay). | 2. <b>Delivery:</b> Based on quantity.<br>
+                3. <b>Payment:</b> 100% Advance against PI. | 4. <b>Validity:</b> Offer valid for today only.
+            </div>
+
+            <div style="margin-top:40px; display:flex; justify-content:space-between; align-items:flex-end;">
+                <div style="font-size:11px; color:#666; font-style:italic;">Looking forward to your valued order.</div>
+                <div style="text-align:right;">
+                    <p style="margin-bottom:40px; font-size:13px;">For <b>Saru Aikoh Chemicals Pvt. Ltd.</b></p>
+                    <b id="p-sName" style="font-size:15px; color:var(--primary);"></b><br>
+                    <span id="p-sDesig" style="font-size:12px; color:#475569;"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentRefNum = parseInt(localStorage.getItem('sacpl_ref_count')) || 34;
+
+    function fitContentToSinglePage() {
+        const canvas = document.getElementById('quotation-canvas');
+        const content = canvas ? canvas.querySelector('.content-layer') : null;
+        if (!canvas || !content) return;
+
+        // Reset first so measurement is always based on natural content size.
+        content.style.transform = 'scale(1)';
+        content.style.width = '100%';
+
+        const style = window.getComputedStyle(canvas);
+        const availableHeight = canvas.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+
+        let naturalHeight = content.scrollHeight;
+        let scale = Math.min(1, availableHeight / naturalHeight);
+
+        // When content is reduced, make the inner layer wider before scaling.
+        // This keeps the quotation using the full page width instead of leaving blank space on the right.
+        if (scale < 1) {
+            content.style.width = `${100 / scale}%`;
+            naturalHeight = content.scrollHeight;
+            scale = Math.min(1, availableHeight / naturalHeight);
+            content.style.width = `${100 / scale}%`;
+        }
+
+        content.style.transform = `scale(${scale})`;
+    }
+
+    function schedulePageFit() {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(fitContentToSinglePage);
+        });
+    }
+
+    function numberToWords(num) {
+        const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+        const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        
+        function makeWords(n) {
+            if (n < 20) return a[n];
+            let s = b[Math.floor(n / 10)];
+            if (n % 10 > 0) s += '-' + a[n % 10];
+            return s;
+        }
+
+        let n = Math.floor(num);
+        if (n === 0) return 'Zero';
+        
+        let words = '';
+        if (Math.floor(n / 10000000) > 0) { words += makeWords(Math.floor(n / 10000000)) + 'Crore '; n %= 10000000; }
+        if (Math.floor(n / 100000) > 0) { words += makeWords(Math.floor(n / 100000)) + 'Lakh '; n %= 100000; }
+        if (Math.floor(n / 1000) > 0) { words += makeWords(Math.floor(n / 1000)) + 'Thousand '; n %= 1000; }
+        if (Math.floor(n / 100) > 0) { words += makeWords(Math.floor(n / 100)) + 'Hundred '; n %= 100; }
+        if (n > 0) { if (words !== '') words += 'and '; words += makeWords(n); }
+        
+        return words.trim() + ' Only';
+    }
+    
+    function init() {
+        document.getElementById('qDate').value = new Date().toISOString().split('T')[0];
+        setRefDisplay();
+        addProductRow("SARU MASTER ALLOY ALCR10%", "500 Kgs", "480.00", "[In Ingot Form]");
+        updatePreview();
+    }
+
+    function setRefDisplay() {
+        let padded = currentRefNum.toString().padStart(4, '0');
+        document.getElementById('refNo').value = `SACPL/QTN/26-27/${padded}`;
+        document.getElementById('p-ref').innerText = document.getElementById('refNo').value;
+    }
+
+    function addProductRow(name="", qty="", rate="", desc="") {
+        const container = document.getElementById('product-inputs');
+        const div = document.createElement('div');
+        div.className = 'prod-row';
+        div.innerHTML = `
+            <div class="row-top">
+                <input type="text" class="p-name" placeholder="Product Name" value="${name}" oninput="updatePreview()">
+                <input type="text" class="p-qty" placeholder="Qty" value="${qty}" oninput="updatePreview()">
+                <input type="number" class="p-rate" placeholder="Rate" value="${rate}" oninput="updatePreview()">
+                <button class="btn-del" onclick="this.parentElement.parentElement.remove(); updatePreview();">×</button>
+            </div>
+            <input type="text" class="p-desc" placeholder="Description" value="${desc}" oninput="updatePreview()">
+        `;
+        container.appendChild(div);
+        updatePreview();
+    }
+
+    function updatePreview() {
+        document.getElementById('p-date').innerText = document.getElementById('qDate').value.split('-').reverse().join('.');
+        document.getElementById('p-client').innerText = document.getElementById('clientDetails').value;
+        const attnVal = document.getElementById('attn').value;
+        document.getElementById('attn-line').style.display = attnVal.trim() === "" ? "none" : "block";
+        document.getElementById('p-attn').innerText = attnVal;
+        document.getElementById('p-source').innerText = document.getElementById('source').value;
+        document.getElementById('p-discussion').innerText = document.getElementById('discussion').value;
+
+        const rows = document.querySelectorAll('.prod-row');
+        let html = ''; let sub = 0; let firstProduct = "PRODUCT";
+        
+        rows.forEach((row, index) => {
+            const name = row.querySelector('.p-name').value;
+            const desc = row.querySelector('.p-desc').value;
+            const qtyStr = row.querySelector('.p-qty').value;
+            const rate = parseFloat(row.querySelector('.p-rate').value) || 0;
+            const qtyNum = parseFloat(qtyStr.replace(/[^\d.]/g, '')) || 0;
+            const total = qtyNum * rate;
+            sub += total;
+            if(index === 0 && name) firstProduct = name;
+            if(name) {
+                html += `<tr><td><b>${name}</b>${desc ? `<br><span class="p-desc-text">${desc}</span>` : ''}</td><td>${qtyStr}</td><td>₹${rate.toFixed(2)}</td><td>₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td></tr>`;
+            }
+        });
+
+        document.getElementById('p-subject').innerText = `QUOTATION FOR ${firstProduct}`;
+        document.getElementById('p-table-body').innerHTML = html;
+        let gst = sub * 0.18;
+        let grand = sub + gst;
+
+        document.getElementById('p-sub').innerText = "₹ " + sub.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('p-gst').innerText = "₹ " + gst.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('p-grand').innerText = "₹ " + grand.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('p-amount-words').innerText = "In Words: " + numberToWords(grand);
+
+        const s = document.getElementById('sender').value.split('|');
+        document.getElementById('p-sName').innerText = s[0];
+        document.getElementById('p-sDesig').innerText = s[1];
+
+        schedulePageFit();
+    }
+
+    window.addEventListener('resize', schedulePageFit);
+
+    async function downloadPDF() {
+
+    const status = document.getElementById('status');
+    const element = document.getElementById('quotation-canvas');
+    const refNo = document.getElementById('refNo').value;
+
+    fitContentToSinglePage();
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    const opt = {
+        margin: 0,
+        filename: `${refNo.replace(/\//g, '_')}.pdf`,
+        html2canvas: { scale: 3 },
+        jsPDF: { unit: 'mm', format: 'a4' }
+    };
+
+    // ✅ 1. INSTANT DOWNLOAD
+    html2pdf().set(opt).from(element).save();
+
+    status.innerText = "Downloaded ✅ | Uploading...";
+
+    try {
+
+        // ✅ 2. BACKGROUND PDF
+        const pdfBlob = await html2pdf()
+            .set(opt)
+            .from(element)
+            .toPdf()
+            .output('blob');
+
+        const reader = new FileReader();
+        reader.readAsDataURL(pdfBlob);
+
+        reader.onloadend = function () {
+
+            const pdfBase64 = reader.result.split(',')[1];
+
+            const hindalcoPrice = (document.getElementById('hindalcoPrice').value || '').trim();
+            const nalcoPrice = (document.getElementById('nalcoPrice').value || '').trim();
+
+            const data = {
+                refNo: refNo,
+                client: document.getElementById('clientDetails').value,
+                product: document.querySelector('.p-name').value,
+                qty: document.querySelector('.p-qty').value,
+                rate: document.querySelector('.p-rate').value,
+                total: document.getElementById('p-grand').innerText,
+                hindalcoPrice: hindalcoPrice,
+                nalcoPrice: nalcoPrice
+            };
+
+            // ✅ 3. BACKEND CALL
+            fetch("https://script.google.com/macros/s/AKfycbzynPeUeARUTypw5YnoazVfi-pOVEQB_g3lUSxKK6c7DfjOSwMBCyRr38w_Hk4NcD4HsQ/exec", {
+                method: "POST",
+                mode: "no-cors", 
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    data: data,
+                    pdfBase64: pdfBase64,
+                    fileName: refNo + ".pdf"
+                })
+            })
+            .then(() => {
+                status.innerText = "Saved to Drive ✅";
+            })
+            .catch(() => {
+                status.innerText = "Upload Failed ❌";
+            });
+        };
+
+        // ✅ REF UPDATE
+        currentRefNum++;
+        localStorage.setItem('sacpl_ref_count', currentRefNum);
+        setRefDisplay();
+
+    } catch (err) {
+        console.error(err);
+        status.innerText = "Error ❌";
+    }
+}
+
+    init();
+</script>
+</body>
+</html>
